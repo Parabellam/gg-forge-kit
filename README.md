@@ -9,13 +9,14 @@ Utilidades compartidas por los bots de Discord de GG Forge. Diseño y hoja de ru
 | `gg_forge_kit.logs` | `setup_logging()` al arrancar |
 | `gg_forge_kit.heartbeat` | `Heartbeat(url, is_healthy=...)` → `.start()` hace ping cada 10 min; `.fail(motivo)` |
 | `gg_forge_kit.alerts` | `EmailAlerter.from_env(bot_name=...)` → `await .send(asunto, cuerpo)` |
+| `gg_forge_kit.validation` | Validar JSON de config: `check_keys` (clave desconocida → error con sugerencia; `_x` = comentario), `discord_id(s)`, `choice`, `positive_int`, `positive_number`, `string_list`, `ConfigError` |
 
 ## Instalar en un bot
 
 Producción (`requirements.txt`), fijado a una versión:
 
 ```
-gg-forge-kit @ https://github.com/Parabellam/gg-forge-kit/archive/refs/tags/v0.1.0.tar.gz
+gg-forge-kit @ https://github.com/Parabellam/gg-forge-kit/archive/refs/tags/v0.2.0.tar.gz
 ```
 
 Desarrollo local (desde la carpeta del bot):
