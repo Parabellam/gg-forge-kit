@@ -6,7 +6,7 @@ import pytest
 
 from gg_forge_kit.alerts import RESEND_URL, EmailAlerter
 from gg_forge_kit.config import load_json, optional_env, require_env
-from gg_forge_kit.heartbeat import Heartbeat
+from gg_forge_kit.heartbeat import RETRY_SECONDS, Heartbeat
 
 
 class FakePost:
@@ -94,6 +94,20 @@ async def test_heartbeat_disabled_without_url():
 async def test_heartbeat_swallows_network_errors():
     hb = Heartbeat("https://hc-ping.com/abc", post=FakePost(raises=OSError("sin red")))
     assert await hb.ping() is False
+
+
+async def test_heartbeat_retries_soon_until_first_ping_succeeds():
+    """Tras un despliegue el bot tarda unos segundos en conectarse: no hay que esperar 10 min."""
+    healthy = [False]
+    hb = Heartbeat("https://hc-ping.com/abc", is_healthy=lambda: healthy[0], post=FakePost())
+    assert await hb.tick() == RETRY_SECONDS
+    healthy[0] = True
+    assert await hb.tick() == 600
+
+
+async def test_heartbeat_retries_soon_after_network_error():
+    hb = Heartbeat("https://hc-ping.com/abc", post=FakePost(raises=OSError("sin red")))
+    assert await hb.tick() == RETRY_SECONDS
 
 
 def test_heartbeat_default_interval_is_ten_minutes():

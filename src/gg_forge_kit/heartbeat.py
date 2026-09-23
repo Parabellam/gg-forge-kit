@@ -9,6 +9,7 @@ from gg_forge_kit._http import PostFn, http_post
 log = logging.getLogger(__name__)
 
 DEFAULT_INTERVAL_MINUTES = 10
+RETRY_SECONDS = 30
 
 
 class Heartbeat:
@@ -17,6 +18,10 @@ class Heartbeat:
     Si el bot deja de hacer ping, healthchecks.io avisa por correo. Por eso **no** se hace ping
     cuando `is_healthy()` es falso (p. ej. el bot perdió la conexión con Discord): callarse es
     la forma de pedir ayuda.
+
+    Si un ping no sale (bot aún conectándose, o fallo de red) se reintenta a los
+    `RETRY_SECONDS` en vez de esperar el intervalo completo: si no, tras cada despliegue el
+    primer ping tardaría un intervalo entero y healthchecks.io daría una falsa alarma.
 
     Sin URL configurada el latido queda desactivado; así el bot funciona igual en local.
     """
@@ -34,6 +39,7 @@ class Heartbeat:
         self._is_healthy = is_healthy
         self._post = post
         self._task: asyncio.Task[None] | None = None
+        self._was_unhealthy = False
 
     @property
     def enabled(self) -> bool:
@@ -44,8 +50,13 @@ class Heartbeat:
         if not self.url:
             return False
         if not self._is_healthy():
-            log.warning("Latido omitido: el bot no está sano.")
+            if not self._was_unhealthy:  # solo al cambiar de estado, para no inundar el log
+                log.warning("Latido omitido: el bot no está sano.")
+            self._was_unhealthy = True
             return False
+        if self._was_unhealthy:
+            log.info("Bot sano de nuevo: se reanuda el latido.")
+            self._was_unhealthy = False
         return await self._send(self.url, None)
 
     async def fail(self, reason: str) -> bool:
@@ -71,10 +82,14 @@ class Heartbeat:
                 pass
             self._task = None
 
+    async def tick(self) -> float:
+        """Un ciclo del latido. Devuelve cuántos segundos esperar hasta el siguiente."""
+        sent = await self.ping()
+        return self.interval_seconds if sent else RETRY_SECONDS
+
     async def _loop(self) -> None:
         while True:
-            await self.ping()
-            await asyncio.sleep(self.interval_seconds)
+            await asyncio.sleep(await self.tick())
 
     async def _send(self, url: str, text: str | None) -> bool:
         try:
