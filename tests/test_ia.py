@@ -79,6 +79,17 @@ async def test_chain_falls_back_in_order():
     assert r.proveedor == "gemini" and (a.calls, b.calls, c.calls) == (1, 1, 0)
 
 
+async def test_slow_provider_times_out_and_falls_back():
+    import asyncio
+
+    class Slow(Fixed):
+        async def completar(self, sistema, mensaje, max_tokens):
+            await asyncio.sleep(10)
+
+    r = await ClienteIA([Slow("claude", "tarde"), Fixed("gemini", "ok")], timeout=0.05).completar("s", "m")
+    assert r.proveedor == "gemini"
+
+
 async def test_chain_reports_every_failure():
     with pytest.raises(SinRespuestaError) as err:
         await ClienteIA([Fixed("claude", RuntimeError("caído")), Fixed("gemini", ProveedorError("vacía"))]).completar("s", "m")

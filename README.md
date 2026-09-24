@@ -17,7 +17,7 @@ Utilidades compartidas por los bots de Discord de GG Forge. Diseño y hoja de ru
 Producción (`requirements.txt`), fijado a una versión:
 
 ```
-gg-forge-kit @ https://github.com/Parabellam/gg-forge-kit/archive/refs/tags/v0.3.0.tar.gz
+gg-forge-kit @ https://github.com/Parabellam/gg-forge-kit/archive/refs/tags/v0.3.1.tar.gz
 ```
 
 Con IA: `gg-forge-kit[ia] @ …` (instala los SDK de Anthropic, Gemini y OpenAI).

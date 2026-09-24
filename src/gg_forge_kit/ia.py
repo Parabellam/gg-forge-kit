@@ -17,6 +17,7 @@ Variables de entorno:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass
 from typing import Any, Protocol
@@ -30,6 +31,9 @@ DEFAULT_GEMINI_MODEL = "gemini-3.6-flash"
 DEFAULT_ORDER = ("claude", "gemini", "openai")
 DEFAULT_MAX_TOKENS = 16000  # con el pensamiento adaptativo de Claude, quedarse corto trunca la respuesta
 CLAUDE_FALLBACK_BETA = "server-side-fallback-2026-07-01"
+# Tiempo máximo por proveedor. Sin límite, el SDK de Anthropic espera hasta 10 min y reintenta: una
+# pregunta de Discord (cuyo token de respuesta caduca a los 15 min) se quedaba «pensando» para siempre.
+DEFAULT_TIMEOUT = 120.0
 
 
 @dataclass(frozen=True)
@@ -75,7 +79,7 @@ class ClaudeProveedor:
         if client is None:
             import anthropic
 
-            client = anthropic.AsyncAnthropic(api_key=api_key)
+            client = anthropic.AsyncAnthropic(api_key=api_key, timeout=DEFAULT_TIMEOUT, max_retries=1)
         self.client = client
         self.modelo = modelo
 
@@ -133,7 +137,7 @@ class OpenAIProveedor:
         if client is None:
             import openai
 
-            client = openai.AsyncOpenAI(api_key=api_key)
+            client = openai.AsyncOpenAI(api_key=api_key, timeout=DEFAULT_TIMEOUT, max_retries=1)
         self.client = client
         self.modelo = modelo
 
@@ -149,7 +153,8 @@ class OpenAIProveedor:
 
 
 class ClienteIA:
-    def __init__(self, proveedores: list[Proveedor]) -> None:
+    def __init__(self, proveedores: list[Proveedor], *, timeout: float = DEFAULT_TIMEOUT) -> None:
+        self.timeout = timeout
         self.proveedores = proveedores
 
     @property
@@ -178,7 +183,7 @@ class ClienteIA:
         errores: dict[str, str] = {}
         for proveedor in self.proveedores:
             try:
-                respuesta = await proveedor.completar(sistema, mensaje, max_tokens)
+                respuesta = await asyncio.wait_for(proveedor.completar(sistema, mensaje, max_tokens), self.timeout)
             except Exception as e:  # cualquier fallo de un proveedor → el siguiente
                 errores[proveedor.nombre] = f"{type(e).__name__}: {e}"[:300]
                 log.warning("IA %s falló (%s), probando el siguiente proveedor", proveedor.nombre, errores[proveedor.nombre])
